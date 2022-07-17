@@ -1,0 +1,23 @@
+#  validation mot 15
+MODEL_DIR="output/jun3_2080ti"
+python d2_main.py \
+  --config-file configs/mot_detectron2/p3aformer_small.yaml --eval-only  \
+  --num-gpus 1 DATALOADER.NUM_WORKERS 0 SOLVER.IMS_PER_BATCH 2 SOLVER.MAX_ITER 83100 MODEL.WEIGHTS ${MODEL_DIR}"/model_final.pth" INPUT.VAL_DATA_DIR "/data/dataset/MOT15" MODEL.DENSETRACK.ENC_LAYERS 2 MODEL.DENSETRACK.DEC_LAYERS 3 OUTPUT_DIR ${MODEL_DIR} TRACK.DENSETRACK.TRACK_THRE 0.2
+
+# validation mot17
+MODEL_DIR="output/jun3_2080ti"
+SPLIT="val_half"
+MODEL_NAME=${MODEL_DIR}"/model_final.pth"
+python d2_main.py \
+  --config-file configs/mot_detectron2/p3aformer_small.yaml --eval-only  \
+  --num-gpus 1 DATALOADER.NUM_WORKERS 0 SOLVER.IMS_PER_BATCH 1 MODEL.WEIGHTS ${MODEL_NAME} INPUT.VAL_DATA_DIR "/data/dataset/mot" DATASETS.TEST '("MOT17",)' MODEL.DENSETRACK.ENC_LAYERS 2 MODEL.DENSETRACK.DEC_LAYERS 3 OUTPUT_DIR ${MODEL_DIR} TRACK.DENSETRACK.TRACK_THRE 0.5 TRACK.DENSETRACK.PRE_THRE 0.0 TRACK.DENSETRACK.OUT_THRE 0.0
+  
+  #  TRACK.VIS True
+
+# debug only
+MODEL_DIR="output/april17_2080ti"
+SPLIT="val_half"
+MODEL_NAME=${MODEL_DIR}"/model_0039999.pth"
+python d2_main.py \
+  --config-file configs/mot_detectron2/p3aformer_small.yaml --eval-only  \
+  --num-gpus 1 DATALOADER.NUM_WORKERS 0 SOLVER.IMS_PER_BATCH 1 MODEL.WEIGHTS ${MODEL_NAME} INPUT.VAL_DATA_DIR "/data/dataset/mot" DATASETS.TEST '("MOT17",)' MODEL.DENSETRACK.ENC_LAYERS 2 MODEL.DENSETRACK.DEC_LAYERS 3 OUTPUT_DIR ${MODEL_DIR} TRACK.DENSETRACK.TRACK_THRE 0.0 TRACK.DENSETRACK.PRE_THRE 0.0 TRACK.DENSETRACK.OUT_THRE 0.0 TRACK.VIS True

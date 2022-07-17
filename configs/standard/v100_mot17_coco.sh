@@ -1,0 +1,1 @@
+python -m torch.distributed.launch --nproc_per_node=8 --use_env main_coco_tracking.py --output_dir=./output/whole_coco --batch_size=3 --num_workers=20 --resume=./pretrained/r50_deformable_detr-checkpoint.pth --pre_hm --tracking --data_dir=/data/dataset/coco

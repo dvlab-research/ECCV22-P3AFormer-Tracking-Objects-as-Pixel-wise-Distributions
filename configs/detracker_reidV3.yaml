@@ -1,0 +1,40 @@
+tracktor:
+  name: P3AFormer
+  module_name: MOT
+  desription: transformer
+  seed: 12345
+  network: transformer
+
+  output_dir: .
+  obj_detect_model: .
+
+  reid_weights: ResNet_iter_25245.pth
+
+  frame_split: [0.0, 1.0]
+
+  tracker:
+    track_thresh: 0.5
+    out_thresh: 0.3
+    pre_thresh: 0.5
+    new_thresh: 0.3
+    detection_nms_thresh: 0.5
+    motion_model:
+      enabled: False
+      # average velocity over last n_steps steps
+      n_steps: 1
+      # if true, only model the movement of the bounding box center. If false, width and height are also modeled.
+      center_only: True
+    # 0 tells the tracker to use private detections (Faster R-CNN)
+    public_detections: False
+    # How much last appearance features are to keep
+    max_features_num: 10
+    # Do camera motion compensation
+    do_align: True
+    # Use siamese network to do reid
+    do_reid: True
+    # How much timesteps dead tracks are kept and cnosidered for reid
+    inactive_patience: 60
+    # How similar do image and old track need to be to be considered the same person
+    reid_sim_threshold: 2.0
+    # How much IoU do track and image need to be considered for matching
+    reid_iou_threshold: 0.1

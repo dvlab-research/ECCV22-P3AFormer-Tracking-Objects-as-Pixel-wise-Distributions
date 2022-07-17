@@ -1,0 +1,122 @@
+_BASE_: p3aformer_base.yaml
+MODEL:
+  META_ARCHITECTURE: "D2P3AFormer"
+  DENSETRACK:
+    ENC_LAYERS: 2
+    DEC_LAYERS: 2
+    NUM_FEATURE_LEVELS: 4
+    DIM_FEEDFORWARD: 1024
+    HIDDEN_DIM: 256
+    POSITION_EMBEDDING: "sine"
+    BACKBONE: "resnet50"
+    DILATION: False
+    DROPOUT: 0.1
+    DEC_N_POINTS: 4
+    ENC_N_POINTS: 4
+    TRACKING: True
+    SAME_AUG_PRE: True
+    PRE_HM: True
+    HM_WEIGHT: 1.0
+    OFF_WEIGHT: 1.0
+    WH_WEIGHT: 0.1
+    BOXES_WEIGHT: 0.5
+    GIOU_WEIGHT: 0.4
+    CT_OFFSET_WEIGHT: 0.1
+    TRACKING_WEIGHT: 1.0
+    NORM_FACTOR: 1.0
+    DEFAULT_RESOLUTION: [640, 1088]
+SOLVER:
+  OPTIMIZER: "ADAMW"
+  AUX_LOSS: False
+  IMS_PER_BATCH: 2
+  BASE_LR: 1e-4
+  MAX_ITER: 160000
+  WARMUP_FACTOR: 1.0
+  WARMUP_ITERS: 0
+  WEIGHT_DECAY: 0.05
+  OPTIMIZER: "ADAMW"
+  LR_SCHEDULER_NAME: "WarmupPolyLR"
+  BACKBONE_MULTIPLIER: 0.1
+# '''
+# python main.py \
+#    --meta_arch p3aformer \
+#    --data_dir /data/dataset/mix_det \
+#    --dataset_name MOT17 \
+#    --dataset_file p3aformer_mixed \
+#    --batch_size=2  \
+#    --output_dir=./output/whole_MOT17_from_CH \
+#    --num_workers=16 \
+#    --pre_hm \
+#    --tracking \
+#    --same_aug_pre \
+#    --image_blur_aug \
+#    --lr 1e-4 \
+#    --lr_backbone_names ["backbone.0"] \
+#    --lr_backbone 2e-5 \
+#    --lr_linear_proj_names ['reference_points', 'sampling_offsets',] \
+#    --lr_linear_proj_mult 0.1 \
+#    --lr_drop 40 \
+#    --epochs 5 \
+#    --weight_decay 1e-4 \
+#    --clip_max_norm 0.1 \
+#    --backbone 'resnet50' \
+#    --position_embedding 'sine' \
+#    --num_feature_levels 3 \
+#    --enc_layers 2 \
+#    --dec_layers 2 \
+#    --dim_feedforward 1024 \
+#    --hidden_dim 256 \
+#    --shift 0.05 \
+#    --scale 0.05 \
+#    --rotate 0 \
+#    --flip 0.5 \
+#    --hm_disturb 0.05 \
+#    --lost_disturb 0.4 \
+#    --fp_disturb 0.1 \
+#    --track_thresh 0.3 \
+#    --new_thresh 0.3 \
+#    --ltrb_amodal_weight 0.1
+# '''
+  # SEM_SEG_HEAD:
+  #   NAME: "MaskFormerHead"
+  #   IN_FEATURES: ["res2", "res3", "res4", "res5"]
+  #   IGNORE_VALUE: 255
+  #   NUM_CLASSES: 133
+  #   LOSS_WEIGHT: 1.0
+  #   CONVS_DIM: 256
+  #   MASK_DIM: 256
+  #   MASK_DIM: 256
+  #   NORM: "GN"
+  #   # pixel decoder
+  #   PIXEL_DECODER_NAME: "MSDeformAttnPixelDecoder"
+  #   IN_FEATURES: ["res2", "res3", "res4", "res5"]
+  #   DEFORMABLE_TRANSFORMER_ENCODER_IN_FEATURES: ["res3", "res4", "res5"]
+  #   COMMON_STRIDE: 4
+  #   TRANSFORMER_ENC_LAYERS: 6
+  # MASK_FORMER:
+  #   TRANSFORMER_DECODER_NAME: "MultiScaleMaskedTransformerDecoder"
+  #   TRANSFORMER_IN_FEATURE: "multi_scale_pixel_decoder"
+  #   DEEP_SUPERVISION: True
+  #   NO_OBJECT_WEIGHT: 0.1
+  #   CLASS_WEIGHT: 2.0
+  #   MASK_WEIGHT: 5.0
+  #   DICE_WEIGHT: 5.0
+  #   HIDDEN_DIM: 256
+  #   NUM_OBJECT_QUERIES: 100
+  #   NHEADS: 8
+  #   DROPOUT: 0.0
+  #   DIM_FEEDFORWARD: 2048
+  #   ENC_LAYERS: 0
+  #   PRE_NORM: False
+  #   ENFORCE_INPUT_PROJ: False
+  #   SIZE_DIVISIBILITY: 32
+  #   DEC_LAYERS: 10  # 9 decoder layers, add one for the loss on learnable query
+  #   TRAIN_NUM_POINTS: 12544
+  #   OVERSAMPLE_RATIO: 3.0
+  #   IMPORTANCE_SAMPLE_RATIO: 0.75
+  #   TEST:
+  #     SEMANTIC_ON: True
+  #     INSTANCE_ON: True
+  #     PANOPTIC_ON: True
+  #     OVERLAP_THRESHOLD: 0.8
+  #     OBJECT_MASK_THRESHOLD: 0.8

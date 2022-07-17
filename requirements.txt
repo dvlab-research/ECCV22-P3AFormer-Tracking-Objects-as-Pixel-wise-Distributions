@@ -1,0 +1,6 @@
+pycocotools
+tqdm
+cython
+scipy
+lap
+motmetrics
