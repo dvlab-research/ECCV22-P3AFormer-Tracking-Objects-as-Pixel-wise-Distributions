@@ -1,20 +1,10 @@
-# ------------------------------------------------------------------------
-# Copyright (c) 2021 megvii-model. All Rights Reserved.
-# ------------------------------------------------------------------------
-# Modified from Deformable DETR (https://github.com/fundamentalvision/Deformable-DETR)
-# Copyright (c) 2020 SenseTime. All Rights Reserved.
-# ------------------------------------------------------------------------
-# Modified from DETR (https://github.com/facebookresearch/detr)
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
-# ------------------------------------------------------------------------
-
 import torch.utils.data
-from .coco import build as build_coco
 from .detmot import build as build_e2e_mot
 from .static_detmot import build as build_e2e_static_mot
 from .joint import build as build_e2e_joint
 from .torchvision_datasets import CocoDetection
 from .byte_mot_half import build as build_byte_mot_val
+from .p3aformer_dataset.coco import build as build_coco
 from .p3aformer_dataset.mot17_train import build as build_p3aformer_mot
 from .p3aformer_dataset.crowdhuman import CrowdHuman, build_crowdhuman
 from .p3aformer_dataset.mot17_train import build as build_p3aformer_mot_mixed

@@ -5,7 +5,6 @@ EXP_ID='mot17_p3aformer_long_epoch'
 MODEL_NAME='checkpoint0199.pth'
 python3 eval.py \
      --meta_arch p3aformer \
-     --dataset_file e2e_joint \
      --dataset_name MOT15 \
      --epoch 200 \
      --with_box_refine \

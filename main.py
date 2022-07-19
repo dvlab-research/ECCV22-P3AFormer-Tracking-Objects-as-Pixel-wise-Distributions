@@ -23,7 +23,6 @@ from engine import (
     p3aformer_train_one_epoch,
 )
 from models import build_model
-from datasets.p3aformer_dataset.crowdhuman import CrowdHuman
 import pdb
 import os
 
@@ -220,7 +219,7 @@ def get_args_parser():
     parser.add_argument(
         "--dataset_file",
         default="coco",
-        choices=["coco", "crowdHuman", "p3aformer_mot"],
+        choices=["coco", "crowdHuman", "p3aformer_mot", "e2e_joint"],
     )
     parser.add_argument("--gt_file_train", type=str)
     parser.add_argument("--gt_file_val", type=str)
@@ -374,12 +373,8 @@ def get_args_parser():
     )
 
     # tracking
-    parser.add_argument(
-        "--detr_path", default="/data/Dataset/mot", type=str
-    )
-    parser.add_argument(
-        "--reid_path", default="/data/Dataset/mot", type=str
-    )
+    parser.add_argument("--detr_path", default="/data/Dataset/mot", type=str)
+    parser.add_argument("--reid_path", default="/data/Dataset/mot", type=str)
     parser.add_argument("--max_frame_dist", type=int, default=3)
     parser.add_argument("--merge_mode", type=int, default=1)
     parser.add_argument("--tracking", action="store_true")
@@ -478,6 +473,7 @@ def main(args):
         args.dataset_file == "p3aformer_mot"
         or args.dataset_file == "p3aformer_mixed"
         or args.dataset_file == "crowdHuman"
+        or args.dataset_file == "coco"
     ):
         collate_fn = None
     else:
@@ -507,11 +503,6 @@ def main(args):
                 out = True
                 break
         return out
-
-    if args.meta_arch == "p3aformer":
-        for n, p in model_without_ddp.named_parameters():
-            if match_name_keywords(n, args.lr_backbone_names):
-                p.requires_grad = False
 
     param_dicts = [
         {
@@ -663,6 +654,7 @@ def main(args):
         args.dataset_file == "p3aformer_mot"
         or args.dataset_file == "p3aformer_mixed"
         or args.dataset_file == "crowdHuman"
+        or args.dataset_file == "coco"
     ):
         train_func = p3aformer_train_one_epoch
     else:
@@ -742,7 +734,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        "Deformable DETR training and evaluation script", parents=[get_args_parser()]
+        "P3AFormer training and evaluation script", parents=[get_args_parser()]
     )
     args = parser.parse_args()
     if args.output_dir:

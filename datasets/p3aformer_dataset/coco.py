@@ -99,3 +99,18 @@ class COCO(GenericDataset):
         coco_eval.evaluate()
         coco_eval.accumulate()
         coco_eval.summarize()
+
+
+def build(image_set, args):
+    d = COCO(args, image_set)
+    # input output shapes
+    args.input_h, args.input_w = d.default_resolution[0], d.default_resolution[1]
+    args.output_h = args.input_h // args.down_ratio
+    args.output_w = args.input_w // args.down_ratio
+    args.input_res = max(args.input_h, args.input_w)
+    args.output_res = max(args.output_h, args.output_w)
+    # threshold
+    args.out_thresh = max(args.track_thresh, args.out_thresh)
+    args.pre_thresh = max(args.track_thresh, args.pre_thresh)
+    args.new_thresh = max(args.track_thresh, args.new_thresh)
+    return d

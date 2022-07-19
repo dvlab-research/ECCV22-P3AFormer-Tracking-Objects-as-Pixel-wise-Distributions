@@ -124,9 +124,14 @@ bash configs/standard/v100_mot17_fine_tune_mot17.sh
 ```
 
 ## Tracking
-
+Get training performance scores (note this command needs only a 2080ti card to run):
 ```bash
 bash configs/standard/v100_test_mot17.sh
+```
+
+Submit the results to MOT17 challenge website (note this command needs only a 2080ti card to run):
+```bash
+bash configs/standard/v100_submit_mot17.sh
 ```
 
 ## Result and Models on MOT17
@@ -142,6 +147,24 @@ The Detectron2 version of the P3AFormer and the whitles and bells are not organi
 
 The code flow diagram is provided as follows:
 ![Association](figs/model_mind_flow.png "This is model diagram of P3AFormer.")
+
+## TODO List
+
+- [ ] Jupyter notebook support for a quick demo.  
+- [ ] YOLO-X style tracking objects as pixel-wise distributions.  
+
+## Tips & QAs
+1. What if the CUDA OOM happens when killing the program via "ctrl + C"?
+   
+   Try this command to kill all programs using GPUs, do not run this if you have other useful processes using GPUs:
+   ```bash
+   lsof /dev/nvidia* | awk '{print $2}' | xargs -I {} kill {}
+   ```
+
+2. How to develop?
+   
+   Using the debug scripts under the configs folder first and then run experiments on 2080Ti / V100.
+
 
 ## Citation & Acknowledgements
 

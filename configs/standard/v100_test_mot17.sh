@@ -1,10 +1,10 @@
 # for MOT17
-EXP_DIR=output/july5_mot17_finetune
-EXP_ID='Jul7WholeFineProcedure'
-MODEL_NAME=checkpoint0044.pth  # our trained
+EXP_DIR=output/jul16_mot17_finetune
+EXP_ID='Jul18Validate'
+MODEL_NAME=checkpoint0049.pth  # our trained
 python3 eval.py \
+     --dataset_file p3aformer_mot \
      --meta_arch p3aformer \
-     --dataset_file e2e_joint \
      --dataset_name MOT17 \
      --epoch 200 \
      --with_box_refine \

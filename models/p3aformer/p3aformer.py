@@ -41,17 +41,16 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn
-from .transcenter_losses.utils import _sigmoid
-from .transcenter_losses.losses import FastFocalLoss, RegWeightedL1Loss, loss_boxes
+from .p3aformer_losses.utils import _sigmoid
+from .p3aformer_losses.losses import FastFocalLoss, RegWeightedL1Loss, loss_boxes
 from util.p3aformer.p3aformer_misc import NestedTensor
-from .transcenter_post_processing.decode import generic_decode
-from .transcenter_post_processing.post_process import generic_post_process
-from .transcenter_backbone import build_backbone
+from .p3aformer_post_processing.decode import generic_decode
+from .p3aformer_post_processing.post_process import generic_post_process
+from .p3aformer_backbone import build_backbone
 from .p3aformer_deformable_transformer import build_deforamble_transformer
 import copy
-from .transcenter_dla import IDAUpV3
+from .p3aformer_dla import IDAUpV3
 from torch import Tensor
-import pdb
 
 
 def _get_clones(module, N):
@@ -72,7 +71,6 @@ class GenericLoss(torch.nn.Module):
         self.crit_reg = RegWeightedL1Loss()
         self.opt = opt
         self.weight_dict = weight_dict
-        self.allow_missing = True
 
     def _sigmoid_output(self, output):
         if "hm" in output:
@@ -83,7 +81,9 @@ class GenericLoss(torch.nn.Module):
         opt = self.opt
         regression_heads = ["reg", "wh", "tracking", "center_offset"]
         losses = {}
+
         outputs = self._sigmoid_output(outputs)
+
         for s in range(opt.dec_layers):
             if s < opt.dec_layers - 1:
                 end_str = f"_{s}"
@@ -105,12 +105,7 @@ class GenericLoss(torch.nn.Module):
 
             for head in regression_heads:
                 if head in outputs:
-                    if self.allow_missing and (
-                        head + "_mask" not in batch or head not in outputs
-                    ):
-                        continue
-                    if outputs[head] is None or len(outputs[head]) == 0:
-                        continue
+                    # print(head)
                     losses[head + end_str] = (
                         self.crit_reg(
                             outputs[head][s],
@@ -120,6 +115,7 @@ class GenericLoss(torch.nn.Module):
                         )
                         / opt.norm_factor
                     )
+
             losses["boxes" + end_str], losses["giou" + end_str] = loss_boxes(
                 outputs["boxes"][s], batch
             )
@@ -148,17 +144,9 @@ class DeformableDETR(nn.Module):
         super().__init__()
         self.transformer = transformer
         self.eval_mode = eval
-        self.dense_fusion = True
-        self.use_prev = True
         hidden_dim = transformer.d_model
 
-        if self.dense_fusion:
-            self.ida_up = IDAUpV3(64, [256, 256, 256, 256], [2, 4, 8, 16])
-            self.linear_compress = nn.Linear(512, 256)
-        else:
-            self.ida_up = IDAUpV3(64, [256, 256, 256, 256], [2, 4, 8, 16])
-            self.linear_compress = None
-
+        self.ida_up = IDAUpV3(64, [256, 256, 256, 256], [2, 4, 8, 16])
         self.ida_up = _get_clones(self.ida_up, 2)
 
         """
@@ -259,6 +247,7 @@ class DeformableDETR(nn.Module):
             nn.init.constant_(proj[0].bias, 0)
 
         num_pred = transformer.decoder.num_layers
+
         self.transformer.decoder.reg = None
         self.transformer.decoder.ida_up = None
         self.transformer.decoder.wh = None
@@ -275,12 +264,92 @@ class DeformableDETR(nn.Module):
         pre_pos: Tensor = None,
     ):
         assert isinstance(samples, NestedTensor)
-        if self.use_prev:
-            assert isinstance(pre_samples, NestedTensor)
+        assert isinstance(pre_samples, NestedTensor)
         if features is None:
             features, pos = self.backbone(samples)
+
         srcs = []
         masks = []
+        with torch.no_grad():
+            if (pre_features is None and self.eval_mode) or not self.eval_mode:
+                pre_features, pre_pos = self.backbone(pre_samples)
+            pre_srcs = []
+            pre_masks = []
+
+        # xyh #
+        for l, (feat, pre_feat) in enumerate(zip(features, pre_features)):
+            src, mask = feat.decompose()
+            srcs.append(self.input_proj[l](src))
+            masks.append(mask)
+
+            # xyh pre
+            pre_src, pre_mask = pre_feat.decompose()
+            pre_srcs.append(self.input_proj[l](pre_src))
+            pre_masks.append(pre_mask)
+
+            assert mask is not None
+            assert pre_mask is not None
+            assert pre_src.shape == src.shape
+
+        # make mask, src, pos embed
+        if self.num_feature_levels > len(srcs):
+            _len_srcs = len(srcs)
+            for l in range(_len_srcs, self.num_feature_levels):
+                if l == _len_srcs:
+                    src = self.input_proj[l](features[-1].tensors)
+                    pre_src = self.input_proj[l](pre_features[-1].tensors)
+
+                else:
+                    src = self.input_proj[l](srcs[-1])
+                    pre_src = self.input_proj[l](pre_srcs[-1])
+                assert pre_src.shape == src.shape
+                m = samples.mask
+                mask = F.interpolate(m[None].float(), size=src.shape[-2:]).to(
+                    torch.bool
+                )[0]
+                pos_l = self.backbone[1](NestedTensor(src, mask)).to(src.dtype)
+                srcs.append(src)
+                masks.append(mask)
+                pos.append(pos_l)
+
+                # pre
+                pre_m = pre_samples.mask
+                pre_mask = F.interpolate(
+                    pre_m[None].float(), size=pre_src.shape[-2:]
+                ).to(torch.bool)[0]
+                pre_pos_l = self.backbone[1](NestedTensor(pre_src, pre_mask)).to(
+                    src.dtype
+                )
+                pre_srcs.append(pre_src)
+                pre_masks.append(pre_mask)
+                pre_pos.append(pre_pos_l)
+
+        if self.query_embed is not None:
+            query_embed = self.query_embed.weight
+        else:
+            query_embed = None
+        merged_hs = self.transformer(
+            srcs,
+            masks,
+            pos,
+            query_embed,
+            pre_srcs=pre_srcs,
+            pre_masks=pre_masks,
+            pre_hms=None,
+            pre_pos_embeds=pre_pos,
+        )
+
+        hs = []
+        pre_hs = []
+
+        pre_hm_out = F.interpolate(
+            pre_hm.float(), size=(pre_hm.shape[2] // 4, pre_hm.shape[3] // 4)
+        )
+
+        for hs_m, pre_hs_m in merged_hs:
+            hs.append(hs_m)
+            pre_hs.append(pre_hs_m)
+
         outputs_coords = []
         outputs_hms = []
         outputs_regs = []
@@ -288,218 +357,47 @@ class DeformableDETR(nn.Module):
         outputs_ct_offsets = []
         outputs_tracking = []
 
-        if self.use_prev:
-            with torch.no_grad():
-                if (pre_features is None and self.eval_mode) or not self.eval_mode:
-                    pre_features, pre_pos = self.backbone(pre_samples)
-                pre_srcs = []
-                pre_masks = []
+        for layer_lvl in range(len(hs)):
 
-            for l, (feat, pre_feat) in enumerate(zip(features, pre_features)):
-                src, mask = feat.decompose()
-                srcs.append(self.input_proj[l](src))
-                masks.append(mask)
+            hs[layer_lvl] = self.ida_up[0](hs[layer_lvl], 0, len(hs[layer_lvl]))[-1]
+            pre_hs[layer_lvl] = self.ida_up[1](
+                pre_hs[layer_lvl], 0, len(pre_hs[layer_lvl])
+            )[-1]
 
-                pre_src, pre_mask = pre_feat.decompose()
-                pre_srcs.append(self.input_proj[l](pre_src))
-                pre_masks.append(pre_mask)
+            ct_offset = self.ct_offset(hs[layer_lvl])
+            wh_head = self.wh(hs[layer_lvl])
+            reg_head = self.reg(hs[layer_lvl])
+            hm_head = self.hm(hs[layer_lvl])
 
-                assert mask is not None
-                assert pre_mask is not None
-                assert pre_src.shape == src.shape
-
-            # make mask, src, pos embed
-            if self.num_feature_levels > len(srcs):
-                _len_srcs = len(srcs)
-                for l in range(_len_srcs, self.num_feature_levels):
-                    if l == _len_srcs:
-                        src = self.input_proj[l](features[-1].tensors)
-                        pre_src = self.input_proj[l](pre_features[-1].tensors)
-                    else:
-                        src = self.input_proj[l](srcs[-1])
-                        pre_src = self.input_proj[l](pre_srcs[-1])
-                    assert pre_src.shape == src.shape
-                    m = samples.mask
-                    mask = F.interpolate(m[None].float(), size=src.shape[-2:]).to(
-                        torch.bool
-                    )[0]
-                    pos_l = self.backbone[1](NestedTensor(src, mask)).to(src.dtype)
-                    srcs.append(src)
-                    masks.append(mask)
-                    pos.append(pos_l)
-
-                    # pre
-                    pre_m = pre_samples.mask
-                    pre_mask = F.interpolate(
-                        pre_m[None].float(), size=pre_src.shape[-2:]
-                    ).to(torch.bool)[0]
-                    pre_pos_l = self.backbone[1](NestedTensor(pre_src, pre_mask)).to(
-                        src.dtype
-                    )
-                    pre_srcs.append(pre_src)
-                    pre_masks.append(pre_mask)
-                    pre_pos.append(pre_pos_l)
-
-            if self.query_embed is not None:
-                query_embed = self.query_embed.weight
-            else:
-                query_embed = None
-            merged_hs = self.transformer(
-                srcs,
-                masks,
-                pos,
-                query_embed,
-                pre_srcs=pre_srcs,
-                pre_masks=pre_masks,
-                pre_hms=None,
-                pre_pos_embeds=pre_pos,
-            )
-            if self.dense_fusion:
-                hs = [ele[0] for ele in merged_hs]
-                for layer_lvl in range(len(hs)):
-                    if self.dense_fusion:
-                        hs[layer_lvl] = [ele[:, :256, :, :] for ele in hs[layer_lvl]]
-                    hs[layer_lvl] = self.ida_up[0](
-                        hs[layer_lvl], 0, len(hs[layer_lvl])
-                    )[-1]
-                    ct_offset = self.ct_offset(hs[layer_lvl])
-                    wh_head = self.wh(hs[layer_lvl])
-                    reg_head = self.reg(hs[layer_lvl])
-                    hm_head = self.hm(hs[layer_lvl])
-                    outputs_whs.append(wh_head)
-                    outputs_ct_offsets.append(ct_offset)
-                    outputs_regs.append(reg_head)
-                    outputs_hms.append(hm_head)
-
-                    # b,2,h,w => b,4,h,w
-                    if not self.eval_mode:
-                        outputs_coords.append(
-                            torch.cat([reg_head + ct_offset, wh_head], dim=1)
-                        )
-                out = {
-                    "hm": torch.stack(outputs_hms),
-                    "wh": torch.stack(outputs_whs),
-                    "reg": torch.stack(outputs_regs),
-                    "center_offset": torch.stack(outputs_ct_offsets),
-                }
-                if not self.eval_mode:
-                    out["boxes"] = torch.stack(outputs_coords)
-            else:
-                hs = []
-                pre_hs = []
-                pre_hm_out = F.interpolate(
-                    pre_hm.float(), size=(pre_hm.shape[2] // 4, pre_hm.shape[3] // 4)
+            tracking_head = self.tracking(
+                torch.cat(
+                    [hs[layer_lvl].detach(), pre_hs[layer_lvl], pre_hm_out], dim=1
                 )
-                for hs_m, pre_hs_m in merged_hs:
-                    hs.append(hs_m)
-                    pre_hs.append(pre_hs_m)
-                for layer_lvl in range(len(hs)):
-                    hs[layer_lvl] = self.ida_up[0](
-                        hs[layer_lvl], 0, len(hs[layer_lvl])
-                    )[-1]
-                    pre_hs[layer_lvl] = self.ida_up[1](
-                        pre_hs[layer_lvl], 0, len(pre_hs[layer_lvl])
-                    )[-1]
-
-                    ct_offset = self.ct_offset(hs[layer_lvl])
-                    wh_head = self.wh(hs[layer_lvl])
-                    reg_head = self.reg(hs[layer_lvl])
-                    hm_head = self.hm(hs[layer_lvl])
-
-                    tracking_head = self.tracking(
-                        torch.cat(
-                            [hs[layer_lvl].detach(), pre_hs[layer_lvl], pre_hm_out],
-                            dim=1,
-                        )
-                    )
-
-                    outputs_whs.append(wh_head)
-                    outputs_ct_offsets.append(ct_offset)
-                    outputs_regs.append(reg_head)
-                    outputs_hms.append(hm_head)
-                    outputs_tracking.append(tracking_head)
-
-                    # b,2,h,w => b,4,h,w
-                    if not self.eval_mode:
-                        outputs_coords.append(
-                            torch.cat([reg_head + ct_offset, wh_head], dim=1)
-                        )
-                out = {
-                    "hm": torch.stack(outputs_hms),
-                    "wh": torch.stack(outputs_whs),
-                    "reg": torch.stack(outputs_regs),
-                    "center_offset": torch.stack(outputs_ct_offsets),
-                    "tracking": torch.stack(outputs_tracking),
-                }
-                if not self.eval_mode:
-                    out["boxes"] = torch.stack(outputs_coords)
-        else:
-            for l, feat in enumerate(features):
-                src, mask = feat.decompose()
-                srcs.append(self.input_proj[l](src))
-                masks.append(mask)
-
-            # make mask, src, pos embed
-            if self.num_feature_levels > len(srcs):
-                _len_srcs = len(srcs)
-                for l in range(_len_srcs, self.num_feature_levels):
-                    if l == _len_srcs:
-                        src = self.input_proj[l](features[-1].tensors)
-                    else:
-                        src = self.input_proj[l](srcs[-1])
-                    m = samples.mask
-                    mask = F.interpolate(m[None].float(), size=src.shape[-2:]).to(
-                        torch.bool
-                    )[0]
-                    pos_l = self.backbone[1](NestedTensor(src, mask)).to(src.dtype)
-                    srcs.append(src)
-                    masks.append(mask)
-                    pos.append(pos_l)
-
-            if self.query_embed is not None:
-                query_embed = self.query_embed.weight
-            else:
-                query_embed = None
-            merged_hs = self.transformer(
-                srcs,
-                masks,
-                pos,
-                query_embed,
-                pre_srcs=None,
-                pre_masks=None,
-                pre_hms=None,
-                pre_pos_embeds=None,
             )
-            hs = [m[0] for m in merged_hs]
-            for layer_lvl in range(len(hs)):
-                hs[layer_lvl] = self.ida_up[0](hs[layer_lvl], 0, len(hs[layer_lvl]))[-1]
-                ct_offset = self.ct_offset(hs[layer_lvl])
-                wh_head = self.wh(hs[layer_lvl])
-                reg_head = self.reg(hs[layer_lvl])
-                hm_head = self.hm(hs[layer_lvl])
 
-                outputs_whs.append(wh_head)
-                outputs_ct_offsets.append(ct_offset)
-                outputs_regs.append(reg_head)
-                outputs_hms.append(hm_head)
+            outputs_whs.append(wh_head)
+            outputs_ct_offsets.append(ct_offset)
+            outputs_regs.append(reg_head)
+            outputs_hms.append(hm_head)
+            outputs_tracking.append(tracking_head)
 
-                # b,2,h,w => b,4,h,w
-                if not self.eval_mode:
-                    outputs_coords.append(
-                        torch.cat([reg_head + ct_offset, wh_head], dim=1)
-                    )
-            out = {
-                "hm": torch.stack(outputs_hms),
-                "wh": torch.stack(outputs_whs),
-                "reg": torch.stack(outputs_regs),
-            }
+            # b,2,h,w => b,4,h,w
             if not self.eval_mode:
-                out["boxes"] = torch.stack(outputs_coords)
+                outputs_coords.append(torch.cat([reg_head + ct_offset, wh_head], dim=1))
+        out = {
+            "hm": torch.stack(outputs_hms),
+            "wh": torch.stack(outputs_whs),
+            "reg": torch.stack(outputs_regs),
+            "center_offset": torch.stack(outputs_ct_offsets),
+            "tracking": torch.stack(outputs_tracking),
+        }
+        if not self.eval_mode:
+            out["boxes"] = torch.stack(outputs_coords)
         return out
 
 
 class PostProcess(nn.Module):
-    """This module converts the model's output into the format expected by the coco api, used in the test time only!"""
+    """This module converts the model's output into the format expected by the coco api"""
 
     def __init__(self, args, valid_ids):
         self.args = args
@@ -532,7 +430,6 @@ class PostProcess(nn.Module):
             out_thresh = self.args.out_thresh
         else:
             out_thresh = 0.0
-
         # get the output of last layer of transformer
         output = {k: v[-1].cpu() for k, v in outputs.items() if k != "boxes"}
 
@@ -580,32 +477,26 @@ class PostProcess(nn.Module):
                 boxes.append(det["bbox"])
                 scores.append(det["score"])
                 labels.append(self._valid_ids[det["class"] - 1])
-                if "tracking" in det:
-                    tracking.append(det["tracking"])
-                if "pre_cts" in det:
-                    pre_cts.append(det["pre_cts"])
+                tracking.append(det["tracking"])
+                pre_cts.append(det["pre_cts"])
             if len(boxes) > 0:
-                track_return = torch.as_tensor(tracking).float() if tracking else None
-                pre_cts = torch.as_tensor(pre_cts).float() if pre_cts else None
                 coco_results.append(
                     {
                         "scores": torch.as_tensor(scores).float(),
                         "labels": torch.as_tensor(labels).int(),
                         "boxes": torch.as_tensor(boxes).float(),
-                        "tracking": track_return,
-                        "pre_cts": pre_cts,
+                        "tracking": torch.as_tensor(tracking).float(),
+                        "pre_cts": torch.as_tensor(pre_cts).float(),
                     }
                 )
             else:
-                track_return = torch.zeros(0, 2).float() if tracking else None
-                pre_cts = torch.zeros(0, 2).float() if pre_cts else None
                 coco_results.append(
                     {
                         "scores": torch.zeros(0).float(),
                         "labels": torch.zeros(0).int(),
                         "boxes": torch.zeros(0, 4).float(),
-                        "tracking": track_return,
-                        "pre_cts": pre_cts,
+                        "tracking": torch.zeros(0, 2).float(),
+                        "pre_cts": torch.zeros(0, 2).float(),
                     }
                 )
         return coco_results
@@ -698,6 +589,7 @@ def build(args):
             90,
         ]
     else:
+
         valid_ids = [1]
 
     device = torch.device(args.device)
@@ -726,7 +618,6 @@ def build(args):
         "center_offset": args.ct_offset_weight,
         "tracking": args.tracking_weight,
     }
-
     if args.aux_loss:
         aux_weight_dict = {}
         for i in range(args.dec_layers - 1):

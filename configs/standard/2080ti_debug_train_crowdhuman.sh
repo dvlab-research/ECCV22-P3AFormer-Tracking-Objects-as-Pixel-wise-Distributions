@@ -1,1 +1,2 @@
-python main_crowdHuman_tracking.py --output_dir=./output/debug_train_ch --batch_size=1 --num_workers=1 --pre_hm --tracking --data_dir=/data/dataset/crowdhuman  --num_feature_levels 3 --enc_layers 2 --dec_layers 2
+python main.py --output_dir=./output/debug_train_ch \
+--dataset_name MOT17 --dataset_file crowdHuman --meta_arch p3aformer --batch_size=1 --num_workers=1 --pre_hm --tracking --data_dir=/data/dataset/crowdhuman  --num_feature_levels 3 --enc_layers 2 --dec_layers 2
