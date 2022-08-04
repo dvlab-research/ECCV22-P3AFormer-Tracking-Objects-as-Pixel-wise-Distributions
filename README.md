@@ -14,8 +14,8 @@ The association scheme is:
 
 ## Installation
 
-1. Install PyTorch and torch vision.
-2. Install detectron2 following the official guidance.
+1. Install PyTorch and torch vision. We tested on Pytorch==1.9.0+cu111, and torchvision==0.10.0+cu111. Other versions might work as well.
+2. Install detectron2 following the official guidance. We use detectron2 == 0.6.0. Other versions might work as well.
 3. Install other dependencies.
 
    ```bash
@@ -24,6 +24,7 @@ The association scheme is:
    pip install gdown
    pip install --upgrade gdown
    ```
+We give a full list of our conda in export_requirements.txt.
 
 ## Download datasets
 
@@ -139,7 +140,7 @@ bash configs/standard/v100_submit_mot17.sh
 
 |  Method   | Detector |           Train Set           |    Test Set    | Public | Inf time (fps) | HOTA | MOTA | IDF1 |  FP   |  FN   | IDSw. |                            Config                            |                                                                                                                                                           Download                                                                                                                                                           |
 | :-------: | :------: | :---------------------------: | :------------: | :----: | :------------: | :--: | :--: | :--: | :---: | :---: | :---: | :----------------------------------------------------------: | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
-| P3AFormer | Our trained  | CrowdHuman + MOT17--train | MOT17-test |   N    |       -        | 55.9 | 69.3 | 68.9 | 19,275 | 151,200 |  2904  | [config](configs/standard/v100_mot17_coco.sh) | [model] \| [log] |
+| P3AFormer | Our trained  | CrowdHuman + MOT17--train | MOT17-test |   N    |       -        | 55.9 | 69.3 | 68.9 | 19,275 | 151,200 |  2904  | [config](configs/standard/v100_mot17_coco.sh) | [model](https://drive.google.com/file/d/1ieM8Z-Ey5nb9hiFGHr0mX6jk_jveGvDe/view?usp=sharing)/[submission](https://drive.google.com/drive/folders/1DzmY_xgqu9KPRl19DxYPgFAhI4IZ-sn4?usp=sharing) |
 
 The Detectron2 version of the P3AFormer and the whitles and bells are not organized well yet (on another dev branch, will be merged into main branch soon), however, you may find the raw codes at [this Google drive link](https://drive.google.com/file/d/18NhDIvBNKyRFQYRdEKZkMO0m1hvNyt8L/view?usp=sharing).
 
