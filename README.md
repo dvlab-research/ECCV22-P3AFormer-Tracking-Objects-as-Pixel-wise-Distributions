@@ -23,8 +23,11 @@ The association scheme is:
    # install gdown to download datasets from Google.
    pip install gdown
    pip install --upgrade gdown
+   cd models/ops
+   bash make.sh  # build extensions if you don't have one, and CUDA is needed.
    ```
-We give a full list of our conda in export_requirements.txt.
+
+   We give a full list of our conda in export_requirements.txt.
 
 ## Download datasets
 
@@ -38,7 +41,7 @@ We give a full list of our conda in export_requirements.txt.
    unzip MOT17.zip
    unzip MOT20.zip
    wget https://motchallenge.net/data/MOT15.zip # optional
-   unzip MOT15.zip 
+   unzip MOT15.zip
    ```
 
 2. Download [CityPersons](https://github.com/Zhongdao/Towards-Realtime-MOT/blob/master/DATASET_ZOO.md) from the official website. Alternately, you can download it via the following commands. When using the following commands, you need to have access to the google drive.
@@ -109,40 +112,46 @@ Convert downloaded data to the standard COCO format. The preprocess tools are in
     ```
 
 ## Training
+
 1. CoCo pretraining:
+
 ```
 bash configs/standard/v100_mot17_coco.sh
 ```
 
 2. CrowdHuman pretraining:
+
 ```
 bash configs/standard/v100_mot17_crowdhuman.sh
 ```
 
 3. MOT17 training:
+
 ```
 bash configs/standard/v100_mot17_fine_tune_mot17.sh
 ```
 
 ## Tracking
+
 Get training performance scores (note this command needs only a 2080ti card to run):
+
 ```bash
 bash configs/standard/v100_test_mot17.sh
 ```
 
 Submit the results to MOT17 challenge website (note this command needs only a 2080ti card to run):
+
 ```bash
 bash configs/standard/v100_submit_mot17.sh
 ```
 
 ## Result and Models on MOT17
 
+|  Method   |  Detector   |         Train Set         |  Test Set  | Public | Inf time (fps) | HOTA | MOTA | IDF1 |   FP   |   FN    | IDSw. |                    Config                     |                                                                                            Download                                                                                            |
+| :-------: | :---------: | :-----------------------: | :--------: | :----: | :------------: | :--: | :--: | :--: | :----: | :-----: | :---: | :-------------------------------------------: | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
+| P3AFormer | Our trained | CrowdHuman + MOT17--train | MOT17-test |   N    |       -        | 55.9 | 69.3 | 68.9 | 19,275 | 151,200 | 2904  | [config](configs/standard/v100_mot17_coco.sh) | [model](https://drive.google.com/file/d/1yNc6-wYOG4EnbOAg4RXuJU7rS1xCqTYZ/view?usp=sharing)/[submission](https://drive.google.com/drive/folders/1DzmY_xgqu9KPRl19DxYPgFAhI4IZ-sn4?usp=sharing) |
 
-|  Method   | Detector |           Train Set           |    Test Set    | Public | Inf time (fps) | HOTA | MOTA | IDF1 |  FP   |  FN   | IDSw. |                            Config                            |                                                                                                                                                           Download                                                                                                                                                           |
-| :-------: | :------: | :---------------------------: | :------------: | :----: | :------------: | :--: | :--: | :--: | :---: | :---: | :---: | :----------------------------------------------------------: | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------: |
-| P3AFormer | Our trained  | CrowdHuman + MOT17--train | MOT17-test |   N    |       -        | 55.9 | 69.3 | 68.9 | 19,275 | 151,200 |  2904  | [config](configs/standard/v100_mot17_coco.sh) | [model](https://drive.google.com/file/d/1ieM8Z-Ey5nb9hiFGHr0mX6jk_jveGvDe/view?usp=sharing)/[submission](https://drive.google.com/drive/folders/1DzmY_xgqu9KPRl19DxYPgFAhI4IZ-sn4?usp=sharing) |
-
-The Detectron2 version of the P3AFormer and the whitles and bells are not organized well yet (on another dev branch, will be merged into main branch soon), however, you may find the raw codes at [this Google drive link](https://drive.google.com/file/d/18NhDIvBNKyRFQYRdEKZkMO0m1hvNyt8L/view?usp=sharing).
+The Detectron2 version of the P3AFormer, some other parts and the whitles and bells are not organized well yet (on other dev branches, will be merged into main branch), however, you may find the raw codes at [this Google drive link](https://drive.google.com/file/d/18NhDIvBNKyRFQYRdEKZkMO0m1hvNyt8L/view?usp=sharing).
 
 ## Code Structure
 
@@ -151,28 +160,30 @@ The code flow diagram is provided as follows:
 
 ## TODO List
 
-- [ ] Jupyter notebook support for a quick demo.  
-- [ ] YOLO-X style tracking objects as pixel-wise distributions.  
+- [ ] Jupyter notebook support for a quick demo.
+- [ ] YOLO-X style tracking objects as pixel-wise distributions.
 
 ## Tips & QAs
+
 1. What if the CUDA OOM happens when killing the program via "ctrl + C"?
-   
+
    Try this command to kill all programs using GPUs, do not run this if you have other useful processes using GPUs:
+
    ```bash
    lsof /dev/nvidia* | awk '{print $2}' | xargs -I {} kill {}
    ```
 
 2. How to develop?
-   
-   Using the debug scripts under the configs folder first and then run experiments on 2080Ti / V100.
 
+   Using the debug scripts under the configs folder first and then run experiments on 2080Ti / V100.
 
 ## Citation & Acknowledgements
 
 If you find our code helpful, please cite our paper:
+
 ```
 @misc{zhao2022tracking,
-      title={Tracking Objects as Pixel-wise Distributions}, 
+      title={Tracking Objects as Pixel-wise Distributions},
       author={Zelin Zhao and Ze Wu and Yueqing Zhuang and Boxun Li and Jiaya Jia},
       year={2022},
       eprint={2207.05518},
@@ -180,8 +191,8 @@ If you find our code helpful, please cite our paper:
       primaryClass={cs.CV}
 }
 ```
-If you have any questions, please contact me at: sjtuytc@gmail.com.
 
+If you have any questions, please contact me at: sjtuytc@gmail.com.
 
 This code uses codes from MOTR, Transcenter-V1 and ByteTrack. Many thanks to their wonderful work. Consider citing them as well:
 
@@ -194,7 +205,7 @@ This code uses codes from MOTR, Transcenter-V1 and ByteTrack. Many thanks to the
 }
 
 @misc{xu2021transcenter,
-      title={TransCenter: Transformers with Dense Representations for Multiple-Object Tracking}, 
+      title={TransCenter: Transformers with Dense Representations for Multiple-Object Tracking},
       author={Yihong Xu and Yutong Ban and Guillaume Delorme and Chuang Gan and Daniela Rus and Xavier Alameda-Pineda},
       year={2021},
       eprint={2103.15145},
